@@ -47,7 +47,7 @@ def barra_html(porcentaje):
     """
 
 with gr.Blocks() as demo:
-    gr.Markdown("## 🎬 Descargar película")
+    gr.Markdown("## 🎬 Descargar película y series")
 
     categoria = gr.Dropdown(choices=categorias_opciones, label="Categoría")
     link = gr.Textbox(label="Link de la película")
