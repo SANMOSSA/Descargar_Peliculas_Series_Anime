@@ -12,7 +12,7 @@ class GestorDescargas:
         if sistema == "Windows":
             self.ruta_base = "M:/codigo_propio/descargar_peliculas_series/peliculas_test"
         else:
-            self.ruta_base = "Multimedia"
+            self.ruta_base = "/mnt/Multimedia"
 
     @staticmethod
     def obter_video_cargado(url: str) -> str | None:

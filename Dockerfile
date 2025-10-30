@@ -18,8 +18,8 @@ RUN playwright install-deps
 RUN playwright install chromium
 
 # Crear carpeta de destino para las películas dentro del contenedor
-RUN mkdir -p /Multimedia/Peliculas
-RUN mkdir -p /Multimedia/Animes
+RUN mkdir -p /mnt/Multimedia/Peliculas
+RUN mkdir -p /mnt/Multimedia/Animes
 
 # Exponer puerto para Gradio
 EXPOSE 8002

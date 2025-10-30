@@ -4,7 +4,7 @@ from core.gestor_descargas import GestorDescargas
 from ui.pelicula_tab import crear_tab_peliculas
 from ui.anime_tab import crear_tab_animes
 
-RUTA_CONFIG = "Multimedia/config.json"
+RUTA_CONFIG = "/mnt/Multimedia/config.json"
 
 # Cargar configuración inicial
 config = json.load(open(RUTA_CONFIG, "r", encoding="utf-8"))
