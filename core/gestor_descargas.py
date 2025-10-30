@@ -10,18 +10,12 @@ class GestorDescargas:
     def __init__(self):
         sistema = platform.system()
         if sistema == "Windows":
-            # Ruta base para Windows si montas volumen ahí
             self.ruta_base = "M:/codigo_propio/descargar_peliculas_series/peliculas_test"
         else:
-            # Ruta base estándar para Linux/Docker
             self.ruta_base = "Multimedia"
 
+    @staticmethod
     def obter_video_cargado(url: str) -> str | None:
-        """
-        Abre la URL en un Chromium headless, espera hasta que exista
-        video#mainVideo source y devuelve su atributo src.
-        timeout_ms: tiempo máximo de espera en milisegundos (por defecto 15s).
-        """
         try:
             respuesta = requests.get(url, timeout=10)
             if respuesta.status_code not in (200, 301, 302):
@@ -29,31 +23,22 @@ class GestorDescargas:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
-                page.goto(url)  # timeout para la navegación
-                # Esperar a que exista el source dentro del video
+                page.goto(url)
                 page.wait_for_selector("video")
                 src = page.get_attribute("video", "src")
                 browser.close()
                 return src
         except PlaywrightTimeoutError:
-            # Timeout al cargar/esperar: devuelve None
             return None
         except Exception as e:
-            # Puedes loguear e imprimir el error si quieres
             print("Error:", e)
             return None
 
     def obtener_extension_real(self, url):
-        """
-        Intenta deducir la extensión del archivo desde la URL o el Content-Type HTTP.
-        Devuelve la extensión con punto (ej: '.mp4') o cadena vacía si no puede determinarla.
-        """
-        # 1. Intentar desde la URL misma
         parsed = urlparse(url)
         ext = os.path.splitext(parsed.path)[1].lower()
         if ext:
             return ext
-        # 2. Intentar desde Content-Type con una solicitud HEAD
         try:
             head = requests.head(url, allow_redirects=True, timeout=10)
             mime = head.headers.get("Content-Type", "").lower()
@@ -66,28 +51,25 @@ class GestorDescargas:
                 "video/webm": ".webm"
             }
             return mime_map.get(mime, "")
-        except Exception as e:
+        except Exception:
             return ""
-        
 
     def obtener_nombre_anime_desde_url(self, url):
-        """
-        Extrae el nombre del anime desde la URL de AnimeFLV.
-        Ej: https://www3.animeflv.net/anime/nombre-del-anime -> nombre-del-anime
-        """
         respuesta = requests.get(url)
         if respuesta.status_code not in (200, 301, 302):
             return None
         with AnimeFLV() as aflv:
             id_anime = url.split("/")[-1]
-            while True:
+            i = 10
+            while i > 0:
                 try:
                     anime = aflv.get_anime_info(id_anime)
                     nombre_limpio = re.sub(r'[^a-zA-Z0-9 ]', '', anime.title)
                     return nombre_limpio
-                except Exception:
-                    pass
-        
+                except Exception as e:
+                    i -= 1
+        return None
+    
     def descargar_anime_con_progreso(self, url, nombre_anime):
         id_anime = url.split("/")[-1]
         ruta_categoria = os.path.join(self.ruta_base, "Animes", nombre_anime)
@@ -181,7 +163,7 @@ class GestorDescargas:
                 mensaje_final += "**Todos los episodios descargados correctamente.**"
             yield 100, mensaje_final
 
-
+    
     def descargar_pelicula_con_progreso(self, categoria, url, nombre_base):
         """
         Descarga un archivo de vídeo con progreso.

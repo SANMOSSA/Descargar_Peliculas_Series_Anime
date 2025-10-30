@@ -15,6 +15,7 @@ filelock==3.20.0
 fsspec==2025.9.0
 gradio==5.49.1
 gradio_client==1.13.3
+greenlet==3.2.4
 groovy==0.1.2
 h11==0.16.0
 hf-xet==1.2.0
@@ -32,9 +33,11 @@ orjson==3.11.4
 packaging==25.0
 pandas==2.3.3
 pillow==11.3.0
+playwright==1.55.0
 pydantic==2.11.10
 pydantic_core==2.33.2
 pydub==0.25.1
+pyee==13.0.0
 Pygments==2.19.2
 pyparsing==3.2.5
 python-dateutil==2.9.0.post0
