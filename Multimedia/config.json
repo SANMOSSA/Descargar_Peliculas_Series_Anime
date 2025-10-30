@@ -1,0 +1,16 @@
+{
+    "categorias_peliculas": [
+        "Accion",
+        "Animacion",
+        "Comedia",
+        "Historia",
+        "Romance",
+        "Terror"
+    ],
+    "lista_animes": [
+        {
+            "nombre": "Disney TwistedWonderland The Animation Episode of Heartslabyul",
+            "url": " https://www3.animeflv.net/anime/disney-twistedwonderland-the-animation-episode-of-heartslabyul"
+        }
+    ]
+}
