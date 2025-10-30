@@ -1,0 +1,24 @@
+{
+    "categorias_peliculas": [
+        "Accion",
+        "Animacion",
+        "Comedia",
+        "Historia",
+        "Romance",
+        "Terror"
+    ],
+    "lista_animes": [
+        {
+            "nombre": "Disney TwistedWonderland The Animation Episode of Heartslabyul",
+            "url": "https://m.animeflv.net/anime/disney-twistedwonderland-the-animation-episode-of-heartslabyul"
+        },
+        {
+            "nombre": "Taiyou yori mo Mabushii Hoshi",
+            "url": "https://m.animeflv.net/anime/taiyou-yori-mo-mabushii-hoshi"
+        },
+        {
+            "nombre": "Busu ni Hanataba wo",
+            "url": "https://m.animeflv.net/anime/busu-ni-hanataba-wo"
+        }
+    ]
+}
