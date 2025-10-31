@@ -14,13 +14,12 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Instalar Chromium para Playwright dentro del contenedor
-RUN playwright install-deps
+# RUN playwright install-deps
 RUN playwright install chromium
 
 # Crear carpeta de destino para las películas dentro del contenedor
-RUN mkdir -p /mnt/Multimedia/Peliculas
-RUN mkdir -p /mnt/Multimedia/Animes
-
+RUN mkdir -p /Multimedia/Peliculas
+RUN mkdir -p /Multimedia/Animes
 # Exponer puerto para Gradio
 EXPOSE 8002
 

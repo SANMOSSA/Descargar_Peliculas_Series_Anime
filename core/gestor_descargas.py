@@ -12,7 +12,7 @@ class GestorDescargas:
         if sistema == "Windows":
             self.ruta_base = "M:/codigo_propio/descargar_peliculas_series/peliculas_test"
         else:
-            self.ruta_base = "/mnt/Multimedia"
+            self.ruta_base = os.path.abspath("Multimedia")
 
     @staticmethod
     def obter_video_cargado(url: str) -> str | None:
@@ -82,7 +82,7 @@ class GestorDescargas:
                 try:
                     anime = aflv.get_anime_info(id_anime)
                     break
-                except Exception:
+                except Exception as e:
                     pass
             total_eps = len(anime.episodes)
             eps_procesados = 0
@@ -97,6 +97,8 @@ class GestorDescargas:
                 descargado = False
                 for servidor in servidores_descarga:
                     if servidor.server == "Stape":
+                        porcentaje = eps_procesados / total_eps * 100
+                        yield porcentaje, "Buscando video ..."
                         video_src = GestorDescargas.obter_video_cargado(servidor.url)
                         if video_src:
                             if video_src.startswith("//"):

@@ -1,10 +1,15 @@
 import json
 import gradio as gr
+import os
 from core.gestor_descargas import GestorDescargas
 from ui.pelicula_tab import crear_tab_peliculas
 from ui.anime_tab import crear_tab_animes
+from utils.file_utils import crear_config_inicial
 
-RUTA_CONFIG = "/mnt/Multimedia/config.json"
+RUTA_CONFIG = os.path.abspath("config.json")
+print(f"Ruta de configuración: {RUTA_CONFIG}")
+if not os.path.exists(RUTA_CONFIG):
+    crear_config_inicial(RUTA_CONFIG)    
 
 # Cargar configuración inicial
 config = json.load(open(RUTA_CONFIG, "r", encoding="utf-8"))
