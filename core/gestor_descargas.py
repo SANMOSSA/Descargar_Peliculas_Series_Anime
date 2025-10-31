@@ -75,7 +75,7 @@ class GestorDescargas:
     
     def descargar_anime_con_progreso(self, url, nombre_anime):
         id_anime = url.split("/")[-1]
-        ruta_categoria = os.path.join(self.ruta_base, "Animes", nombre_anime)
+        ruta_categoria = os.path.join(self.ruta_base, "Animes", nombre_anime, "Season 01")
         os.makedirs(ruta_categoria, exist_ok=True)
         episodios_descargados = {}
         episodios_fallidos = {}
@@ -94,7 +94,7 @@ class GestorDescargas:
                 if episodio.id > 12:
                     eps_procesados += 1
                     continue
-                nombre_episodio = f"{nombre_anime.replace(' ', '.')}S01.E{str(episodio.id).zfill(3)}"
+                nombre_episodio = f"{nombre_anime} S01.E{str(episodio.id).zfill(3)}"
                 ruta_episodio = os.path.join(ruta_categoria, f"{nombre_episodio}")
                 servidores_descarga = aflv.get_links(id_anime, episodio.id)
                 descargado = False
