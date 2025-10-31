@@ -57,6 +57,7 @@ class GestorDescargas:
     def obtener_nombre_anime_desde_url(self, url):
         respuesta = requests.get(url)
         if respuesta.status_code not in (200, 301, 302):
+            print(f"Error al acceder a la URL del anime. Código de estado: {respuesta.status_code} error: {respuesta.text}")
             return None
         with AnimeFLV() as aflv:
             id_anime = url.split("/")[-1]
@@ -67,7 +68,9 @@ class GestorDescargas:
                     nombre_limpio = re.sub(r'[^a-zA-Z0-9 ]', '', anime.title)
                     return nombre_limpio
                 except Exception as e:
+                    print("Error:", e)
                     i -= 1
+            print("No se pudo obtener la información del anime después de varios intentos.")
         return None
     
     def descargar_anime_con_progreso(self, url, nombre_anime):

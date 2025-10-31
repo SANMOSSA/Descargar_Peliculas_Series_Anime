@@ -1,27 +1,29 @@
 FROM python:3.11
 
-# Instalar dependencias de sistema necesarias para Chromium en Playwright
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+# 📌 1. Instalar dependencias del sistema necesarias para Playwright/Chromium
+RUN apt-get update && apt-get install -y wget \
+    && rm -rf /var/lib/apt/lists/*
 
-
-# Crear directorio de trabajo
+# 📌 2. Crear directorio de trabajo
 WORKDIR /app
 
-# Copiar el código dentro del contenedor
-COPY . .
+# 📌 3. Copiar solo requirements.txt para cachear instalación de Python deps
+COPY requirements.txt .
 
-# Instalar dependencias Python
+# 📌 4. Instalar dependencias Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Instalar Chromium para Playwright dentro del contenedor
-RUN playwright install-deps
-RUN playwright install chromium
+# 📌 5. Instalar deps y navegadores de Playwright (solo cuando cambie requirements.txt)
+RUN playwright install-deps && playwright install chromium
 
-# Crear carpeta de destino para las películas dentro del contenedor
-RUN mkdir -p /Multimedia/Peliculas
-RUN mkdir -p /Multimedia/Animes
-# Exponer puerto para Gradio
+# 📌 6. Copiar SOLO ahora el resto del código (no rompe caché de deps)
+COPY . .
+
+# 📌 7. Crear carpetas multimedia
+RUN mkdir -p /Multimedia/Peliculas && mkdir -p /Multimedia/Animes
+
+# 📌 8. Exponer puerto
 EXPOSE 8002
 
-# Comando para iniciar la app
+# 📌 9. Comando por defecto
 CMD ["python", "app.py"]
