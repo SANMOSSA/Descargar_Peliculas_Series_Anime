@@ -94,7 +94,7 @@ class GestorDescargas:
                 if episodio.id > 12:
                     eps_procesados += 1
                     continue
-                nombre_episodio = f"{nombre_anime} S01.E{str(episodio.id).zfill(3)}"
+                nombre_episodio = f"{nombre_anime} S01E{str(episodio.id).zfill(3)}"
                 ruta_episodio = os.path.join(ruta_categoria, f"{nombre_episodio}")
                 servidores_descarga = aflv.get_links(id_anime, episodio.id)
                 descargado = False
