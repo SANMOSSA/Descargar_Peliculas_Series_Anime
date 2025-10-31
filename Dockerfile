@@ -14,7 +14,7 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Instalar Chromium para Playwright dentro del contenedor
-# RUN playwright install-deps
+RUN playwright install-deps
 RUN playwright install chromium
 
 # Crear carpeta de destino para las películas dentro del contenedor
