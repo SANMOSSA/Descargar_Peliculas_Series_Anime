@@ -4,7 +4,12 @@ import requests
 from urllib.parse import urlparse
 from animeflv import AnimeFLV
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import re
+import time
+import multiprocessing
+
 
 class GestorDescargas:
     def __init__(self):
@@ -29,6 +34,7 @@ class GestorDescargas:
                 browser.close()
                 return src
         except PlaywrightTimeoutError:
+            print( "Error PlaywrightTimeoutError")
             return None
         except Exception as e:
             print("Error:", e)
@@ -40,7 +46,7 @@ class GestorDescargas:
         if ext:
             return ext
         try:
-            head = requests.head(url, allow_redirects=True, timeout=10)
+            head = requests.head(url, allow_redirects=True, timeout=30)
             mime = head.headers.get("Content-Type", "").lower()
             mime_map = {
                 "video/mp4": ".mp4",
@@ -51,13 +57,15 @@ class GestorDescargas:
                 "video/webm": ".webm"
             }
             return mime_map.get(mime, "")
-        except Exception:
+        except Exception as e:
+            print(e)
             return ""
 
     def obtener_nombre_anime_desde_url(self, url):
         respuesta = requests.get(url)
         if respuesta.status_code not in (200, 301, 302):
-            print(f"Error al acceder a la URL del anime. Código de estado: {respuesta.status_code} error: {respuesta.text}")
+            print(
+                f"Error al acceder a la URL del anime. Código de estado: {respuesta.status_code} error: {respuesta.text}")
             return None
         with AnimeFLV() as aflv:
             id_anime = url.split("/")[-1]
@@ -70,105 +78,152 @@ class GestorDescargas:
                 except Exception as e:
                     print("Error:", e)
                     i -= 1
-            print("No se pudo obtener la información del anime después de varios intentos.")
+            print(
+                "No se pudo obtener la información del anime después de varios intentos.")
         return None
-    
+
+    def descargar_archivo(self, url, ruta_final, index, progress_dict, mensajes, lock, nombre_episodio):
+        """
+        Descarga un archivo con seguimiento de progreso.
+        """
+        try:
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+                total = int(r.headers.get('Content-Length', 0))
+                # Verificar si el archivo ya existe y tiene el tamaño esperado
+                if os.path.exists(ruta_final):
+                    archivo_peso = os.path.getsize(ruta_final)
+                    if total and archivo_peso >= total:
+                        progress_dict[index] = 1.0
+                        with lock:
+                            mensajes[index] = f"✅ {nombre_episodio} ya descargado"
+                        return
+                downloaded = 0
+                with open(ruta_final, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=1024*1024):  # 1MB
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            progress_dict[index] = downloaded / \
+                                total if total else 0
+                            with lock:
+                                mensajes[index] = f"⬇️ {nombre_episodio} ({downloaded/(1024*1024):.2f}/{total/(1024*1024):.2f} MB)"
+                progress_dict[index] = 1.0
+                with lock:
+                    mensajes[index] = f"✅ {nombre_episodio} descargado"
+        except Exception as e:
+            # marcamos como completado para no bloquear
+            progress_dict[index] = 1.0
+            with lock:
+                mensajes[index] = f"❌ Error en {nombre_episodio}: {str(e)}"
+
     def descargar_anime_con_progreso(self, url, nombre_anime):
+        """
+        Descarga todos los episodios en paralelo rindiendo progreso global y mensajes.
+        """
+        max_workers = min(4, multiprocessing.cpu_count() or 1)
         id_anime = url.split("/")[-1]
-        ruta_categoria = os.path.join(self.ruta_base, "Animes", nombre_anime, "Season 01")
+        ruta_categoria = os.path.join(
+            self.ruta_base, "Animes", nombre_anime, "Season 01")
         os.makedirs(ruta_categoria, exist_ok=True)
-        episodios_descargados = {}
-        episodios_fallidos = {}
-        servidores_alternos = {}
+
+        episodios_urls = []
+        episodios_nombres = []
+        episodios_rutas = []
+        yield 0, "Obteniendo info"
         with AnimeFLV() as aflv:
             while True:
                 try:
                     anime = aflv.get_anime_info(id_anime)
                     break
-                except Exception as e:
+                except:
                     pass
-            total_eps = len(anime.episodes)
-            eps_procesados = 0
             anime.episodes.reverse()
-            for episodio in anime.episodes:
-                if episodio.id > 12:
-                    eps_procesados += 1
-                    continue
-                nombre_episodio = f"{nombre_anime} S01E{str(episodio.id).zfill(3)}"
-                ruta_episodio = os.path.join(ruta_categoria, f"{nombre_episodio}")
-                servidores_descarga = aflv.get_links(id_anime, episodio.id)
-                descargado = False
-                for servidor in servidores_descarga:
-                    if servidor.server == "Stape":
-                        porcentaje = eps_procesados / total_eps * 100
-                        yield porcentaje, "Buscando video ..."
-                        video_src = GestorDescargas.obter_video_cargado(servidor.url)
-                        if video_src:
-                            if video_src.startswith("//"):
-                                video_src = "https:" + video_src
-                            ext_real = self.obtener_extension_real(video_src)
-                            if not ext_real:
-                                episodios_fallidos[episodio.id] = "No se pudo determinar la extensión del archivo."
-                                continue
-                            ruta_final = ruta_episodio + ext_real
-                            
-                            try:
-                                with requests.get(video_src, stream=True) as r:
-                                    r.raise_for_status()
-                                    total = int(r.headers.get('Content-Length', 0))
-                                    if os.path.exists(ruta_final) and os.path.getsize(ruta_final) == total:
-                                        eps_procesados += 1
-                                        porcentaje = eps_procesados / total_eps * 100
-                                        mensaje = f"✅ Episodio {episodio.id} ya descargado ({eps_procesados}/{total_eps})"
-                                        descargado = True
-                                        yield porcentaje, mensaje
-                                        continue
-                                    descargado_bytes = 0
-                                    with open(ruta_final, 'wb') as f:
-                                        for chunk in r.iter_content(chunk_size=1024*1024):
-                                            if chunk:
-                                                f.write(chunk)
-                                                descargado_bytes += len(chunk)
-                                                if total:
-                                                    porcentaje = (eps_procesados + descargado_bytes / total) / total_eps * 100
-                                                    episodio_actual = f"{episodio.id}/{total_eps}"
-                                                    megas_descargadas =f"({descargado_bytes / (1024*1024):.2f}/{total / (1024*1024):.2f} MB)"
-                                                    mensaje = f"⬇️ Descargando episodio {episodio_actual} {megas_descargadas}"
-                                                    yield porcentaje, mensaje
-                                episodios_descargados[episodio.id] = ruta_final
-                                eps_procesados += 1
-                                porcentaje = eps_procesados / total_eps * 100
-                                mensaje = f"✅ Episodio {episodio.id} descargado ({eps_procesados}/{total_eps})"
-                                yield porcentaje, mensaje
-                                descargado = True
-                            except requests.RequestException as e:
-                                episodios_fallidos[episodio.id] = f"Error al descargar: {str(e)}"
-                            break
-                    else:
-                        if episodio.id not in servidores_alternos:
-                            servidores_alternos[episodio.id] = ""
-                        servidores_alternos[episodio.id] += f"{servidor.server}: {servidor.url}\n"
-                if not descargado:
-                    mensaje = f"❌ Episodio {episodio.id} fallido"
-                    eps_procesados += 1
-                    porcentaje = eps_procesados / total_eps * 100
-                    episodios_fallidos[episodio.id] = "No se pudo descargar desde Stape."
-                    yield porcentaje, mensaje
-            mensaje_final = f"**Descargados:** {eps_procesados-len(episodios_fallidos)} de {total_eps} episodios.\n"
-            if episodios_fallidos:
-                mensaje_final += f"**Fallidos:** {len(episodios_fallidos)}\n\n"
-                mensaje_final += "**Servidores alternos:**\n"
-                for ep_id, enlaces in servidores_alternos.items():
-                    if ep_id in episodios_fallidos:
-                        mensaje_final += f"- Episodio `{ep_id}`:\n"
-                        for enlace in enlaces.strip().split('\n'):
-                            if enlace:
-                                mensaje_final += f"  - {enlace}\n"
-            else:
-                mensaje_final += "**Todos los episodios descargados correctamente.**"
-            yield 100, mensaje_final
 
-    
+            # Obtener los enlaces de descarga secuencialmente para evitar problemas con Playwright
+            resultados = {}
+            urls_faltantes = {}
+
+            # Obtener los enlaces de descarga en paralelo
+            def obtener_link_ep(episodio):
+                try:
+                    servidores_descarga = aflv.get_links(id_anime, episodio.id)
+                    for servidor in servidores_descarga:
+                        if servidor.server == "Stape":
+                            video_src = GestorDescargas.obter_video_cargado(servidor.url)
+                            if video_src:
+                                if video_src.startswith("//"):
+                                    video_src = "https:" + video_src
+                                ext_real = self.obtener_extension_real(video_src)
+                                if not ext_real:
+                                    print("No hay ext")
+                                    return episodio.id, None
+                                nombre_episodio = f"{nombre_anime} S01E{str(episodio.id).zfill(3)}"
+                                ruta_final = os.path.join(ruta_categoria, nombre_episodio + ext_real)
+                                return (episodio.id, video_src, nombre_episodio, ruta_final)
+                            else:
+                                print("No hay video")
+                                return episodio.id, None
+                    print("No hay servidor")
+                    return episodio.id, None
+                except Exception as e:
+                    print(e)
+                    return episodio.id, None
+            while True:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futuros = []
+                    mensaje ={}
+                    numero_eps = len(anime.episodes)
+                    for episodio in anime.episodes:
+                        if episodio.id not in resultados:
+                            mensaje[episodio.id] = f"- ⏳ Obteniendo link ep {episodio.id}"
+                            yield 0, "\n".join(mensaje.values())
+                            futuros.append(executor.submit(obtener_link_ep, episodio))
+                    for f in futuros:
+                        if f.result()[1]:
+                            respuesta = f.result()
+                            resultados[respuesta[0]] = respuesta[1:]
+                            if respuesta[0] in urls_faltantes:
+                                del urls_faltantes[respuesta[0]]
+                            mensaje[respuesta[0]] = f"- ✅ Link {respuesta[0]} obtenido"
+                        else:
+                            urls_faltantes[episodio.id] = episodio
+                        yield 0, "\n".join(mensaje.values())
+                if not urls_faltantes and numero_eps == len(resultados):
+                    break
+            # Ordenar los resultados por la llave (episodio.id)
+            resultados = dict(sorted(resultados.items()))
+            for resultado in resultados.values():
+                if resultado:
+                    video_src, nombre_episodio, ruta_final = resultado
+                    episodios_urls.append(video_src)
+                    episodios_nombres.append(nombre_episodio)
+                    episodios_rutas.append(ruta_final)
+        yield 0 , "Enlaces obtenidos"
+        # Diccionarios para progreso y mensajes
+        progress = {i: 0 for i in range(len(episodios_urls))}
+        mensajes = {i: f"Ep {i+1} Pendiente" for i in range(len(episodios_urls))}
+        lock = threading.Lock()
+
+        # Lanzamos descargas en paralelo
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for i, (url_ep, ruta_ep, nombre_ep) in enumerate(zip(episodios_urls, episodios_rutas, episodios_nombres)):
+                executor.submit(self.descargar_archivo, url_ep,
+                                ruta_ep, i, progress, mensajes, lock, nombre_ep)
+
+            total_eps = len(episodios_urls)
+            while True:
+                with lock:
+                    progreso_global = sum(progress.values()) / total_eps * 100
+                    mensajes_actuales = list(mensajes.values())
+                yield progreso_global, "\n".join([f"- {m}" for m in mensajes_actuales])
+                
+                if progreso_global >= 100:
+                    break
+                time.sleep(0.3)
+
+        yield 100, "✅ Todas las descargas finalizadas"
+
     def descargar_pelicula_con_progreso(self, categoria, url, nombre_base):
         """
         Descarga un archivo de vídeo con progreso.
