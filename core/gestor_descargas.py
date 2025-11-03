@@ -121,7 +121,6 @@ class GestorDescargas:
         """
         Descarga todos los episodios en paralelo rindiendo progreso global y mensajes.
         """
-        max_workers = min(4, multiprocessing.cpu_count() or 1)
         id_anime = url.split("/")[-1]
         ruta_categoria = os.path.join(
             self.ruta_base, "Animes", nombre_anime, "Season 01")
@@ -140,11 +139,21 @@ class GestorDescargas:
                     pass
             anime.episodes.reverse()
 
-            # Obtener los enlaces de descarga secuencialmente para evitar problemas con Playwright
             resultados = {}
-            urls_faltantes = {}
+                        
+            numero_eps = len(anime.episodes)
+            threads = []
+            resultados_lock = threading.Lock()
 
-            # Obtener los enlaces de descarga en paralelo
+            def thread_func(episodio, mensaje, resultados):
+                res = obtener_link_ep(episodio)
+                with resultados_lock:
+                    if res[1]:
+                        mensaje[res[0]] = f"- ✅ Link {res[0]} obtenido"
+                        resultados[res[0]] = res[1:]
+                    else:
+                        mensaje[episodio.id] = f"- ❌ Link {episodio.id} no obtenido"
+
             def obtener_link_ep(episodio):
                 try:
                     servidores_descarga = aflv.get_links(id_anime, episodio.id)
@@ -169,29 +178,26 @@ class GestorDescargas:
                 except Exception as e:
                     print(e)
                     return episodio.id, None
-            while True:
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futuros = []
-                    mensaje ={}
-                    numero_eps = len(anime.episodes)
-                    for episodio in anime.episodes:
-                        if episodio.id not in resultados:
-                            mensaje[episodio.id] = f"- ⏳ Obteniendo link ep {episodio.id}"
-                            yield 0, "\n".join(mensaje.values())
-                            futuros.append(executor.submit(obtener_link_ep, episodio))
-                    for f in futuros:
-                        if f.result()[1]:
-                            respuesta = f.result()
-                            resultados[respuesta[0]] = respuesta[1:]
-                            if respuesta[0] in urls_faltantes:
-                                del urls_faltantes[respuesta[0]]
-                            mensaje[respuesta[0]] = f"- ✅ Link {respuesta[0]} obtenido"
-                        else:
-                            urls_faltantes[episodio.id] = episodio
-                        yield 0, "\n".join(mensaje.values())
-                if not urls_faltantes and numero_eps == len(resultados):
-                    break
-            # Ordenar los resultados por la llave (episodio.id)
+
+            # Lanzar los hilos
+            episodios = anime.episodes
+            # Procesar episodios en lotes de máximo 4 hilos por iteración
+            episodios_pendientes = [ep for ep in episodios if ep.id not in resultados]
+            mensaje = {}
+            while episodios_pendientes:
+                threads = []
+                lote = episodios_pendientes[:4]
+                for episodio in lote:
+                    mensaje[episodio.id] = f"- ⏳ Obteniendo link ep {episodio.id}"
+                    yield 0, "\n".join(mensaje.values())
+                    t = threading.Thread(target=thread_func, args=(episodio, mensaje, resultados))
+                    threads.append(t)
+                    t.start()
+                for t in threads:
+                    t.join()
+                episodios_pendientes = [ep for ep in episodios if ep.id not in resultados]
+
+            # Ahora sí, los objetos están listos
             resultados = dict(sorted(resultados.items()))
             for resultado in resultados.values():
                 if resultado:
@@ -199,30 +205,45 @@ class GestorDescargas:
                     episodios_urls.append(video_src)
                     episodios_nombres.append(nombre_episodio)
                     episodios_rutas.append(ruta_final)
-        yield 0 , "Enlaces obtenidos"
+            yield 0 , "Enlaces obtenidos"
+
+
         # Diccionarios para progreso y mensajes
         progress = {i: 0 for i in range(len(episodios_urls))}
         mensajes = {i: f"Ep {i+1} Pendiente" for i in range(len(episodios_urls))}
         lock = threading.Lock()
 
-        # Lanzamos descargas en paralelo
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for i, (url_ep, ruta_ep, nombre_ep) in enumerate(zip(episodios_urls, episodios_rutas, episodios_nombres)):
-                executor.submit(self.descargar_archivo, url_ep,
-                                ruta_ep, i, progress, mensajes, lock, nombre_ep)
+        # Lanzamos descargas en paralelo usando hilos
+        threads = []
+        total_eps = len(episodios_urls)
+        activos = set()
+        i = 0
 
-            total_eps = len(episodios_urls)
-            while True:
-                with lock:
-                    progreso_global = sum(progress.values()) / total_eps * 100
-                    mensajes_actuales = list(mensajes.values())
+        while i < total_eps or activos:
+            # Lanzar hasta 4 hilos activos
+            while len(activos) < 4 and i < total_eps:
+                t = threading.Thread(target=self.descargar_archivo, args=(episodios_urls[i], episodios_rutas[i], i, progress, mensajes, lock, episodios_nombres[i]))
+                threads.append(t)
+                t.start()
+                activos.add(t)
+                i += 1
+
+            # Esperar a que alguno termine
+            for t in list(activos):
+                if not t.is_alive():
+                    activos.remove(t)
+
+            with lock:
+                progreso_global = sum(progress.values()) / total_eps * 100
+                mensajes_actuales = list(mensajes.values())
                 yield progreso_global, "\n".join([f"- {m}" for m in mensajes_actuales])
-                
-                if progreso_global >= 100:
-                    break
-                time.sleep(0.3)
 
-        yield 100, "✅ Todas las descargas finalizadas"
+            if progreso_global >= 100:
+                break
+            time.sleep(0.3)
+        mensajes_actuales = list(mensajes.values())
+        mensajes_actuales.insert(0,"Descarga terminada:")
+        yield 100, "\n".join([f"- {m}" for m in mensajes_actuales])
 
     def descargar_pelicula_con_progreso(self, categoria, url, nombre_base):
         """
