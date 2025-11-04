@@ -40,6 +40,33 @@ class GestorDescargas:
             print("Error:", e)
             return None
 
+    def obtener_datos_anime(self,url:str):
+        respuesta = requests.get(url)
+        if respuesta.status_code not in (200, 301, 302):
+            print(
+                f"Error al acceder a la URL del anime. Código de estado: {respuesta.status_code} error: {respuesta.text}")
+            return None
+        with AnimeFLV() as aflv:
+            id_anime = url.split("/")[-1]
+            i = 10
+            while i > 0:
+                try:
+                    anime = aflv.get_anime_info(id_anime)
+                    datos = {
+                        "titulo":anime.title,
+                        "poster":anime.poster,
+                        "generos": anime.genres,
+                        "sinopsis": anime.synopsis,
+                        "debut":anime.debut
+                    } 
+                    return datos
+                except Exception as e:
+                    print("Error:", e)
+                    i -= 1
+            print(
+                "No se pudo obtener la información del anime después de varios intentos.")
+        return None
+
     def obtener_extension_real(self, url):
         parsed = urlparse(url)
         ext = os.path.splitext(parsed.path)[1].lower()

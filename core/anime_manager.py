@@ -41,3 +41,11 @@ def buscar_episodios(nombre_anime, lista_animes, gestor):
             yield barra_html(0), "Categoría no encontrada."
     else:
         yield barra_html(0), "Categoría no encontrada."
+    
+def obtener_datos_anime(nombre_anime,lista_animes, gestor):
+    for cat in lista_animes:
+        if cat["nombre"] == nombre_anime:
+            return f"<div style='background-color: white;'><iframe src='{cat['url']}' width='100%' height='600px' frameborder='0'></iframe></div>"
+    else:
+        return None
+    

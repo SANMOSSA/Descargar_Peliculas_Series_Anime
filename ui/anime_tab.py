@@ -1,9 +1,6 @@
 import gradio as gr
 from functools import partial
-from core.anime_manager import obtener_nombres_animes, buscar_episodios, agregar_anime
-
-
-
+from core.anime_manager import obtener_nombres_animes, buscar_episodios, agregar_anime,obtener_datos_anime
 
 def crear_tab_animes(lista_animes, gestor, ruta_config):
     def actualizar_drop():
@@ -22,10 +19,11 @@ def crear_tab_animes(lista_animes, gestor, ruta_config):
             interactive=True,
             scale=4
             )
-
         btn_ejecutar = gr.Button("Buscar nuevos episodios")
+
         barra_progreso_anime = gr.HTML()
         salida_proceso = gr.Markdown("Proceso...")
+        datos_anime = gr.HTML("Aqui va el poster")
         actualizar.click(fn=actualizar_drop, outputs=dropdown_cat)
         buscar_fn = partial(
             buscar_episodios, lista_animes=lista_animes, gestor=gestor)
@@ -34,6 +32,9 @@ def crear_tab_animes(lista_animes, gestor, ruta_config):
             inputs=dropdown_cat,
             outputs=[barra_progreso_anime, salida_proceso]
         )
+        datos_fn = partial(
+            obtener_datos_anime,lista_animes=lista_animes, gestor=gestor)
+        dropdown_cat.change(datos_fn, inputs=dropdown_cat, outputs=datos_anime)
 
     with gr.Tab("Agregar nuevo anime"):
         url_input = gr.Textbox(
