@@ -27,7 +27,7 @@ def crear_tab_series(gestor):
     )
     json_serie = gr.Textbox(label="Json")
     barra_progreso_serie = gr.HTML()
-    salida = gr.HTML()
+    salida = gr.Markdown()
     boton_descargar = gr.Button("Descargar")
 
     # Usamos partial para fijar gestor y categorias_peliculas
