@@ -397,3 +397,46 @@ class GestorDescargas:
         mensajes_actuales = list(mensajes.values())
         mensajes_actuales.insert(0, "Descarga terminada:")
         yield 100, "\n".join([f"- {m}" for m in mensajes_actuales])
+
+    def descargar_pelicula_con_progreso(self, categoria, url, nombre_base):
+        """
+        Descarga un archivo de vídeo con progreso.
+        Detecta automáticamente su extensión y la añade al nombre_base.
+        """
+        # Detectar extensión real
+        ext_real = self.obtener_extension_real(url)
+        if not ext_real:
+            yield 0
+            yield f"No se pudo determinar la extensión del archivo desde la URL o Content-Type."
+            return
+
+        # Crear carpeta de categoría
+        ruta_categoria = os.path.join(self.ruta_base, "Peliculas", categoria)
+        os.makedirs(ruta_categoria, exist_ok=True)
+
+        # Nombre final con extensión real
+        nombre_final = os.path.basename(nombre_base.strip()) + ext_real
+        ruta_archivo = os.path.join(ruta_categoria, nombre_final)
+        if os.path.exists(ruta_archivo):
+            yield 100
+        else:
+            try:
+                with requests.get(url, stream=True) as r:
+                    r.raise_for_status()
+                    total = int(r.headers.get('Content-Length', 0))
+                    descargado = 0
+
+                    with open(ruta_archivo, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=1024*1024):  # 1 MB
+                            if chunk:
+                                f.write(chunk)
+                                descargado += len(chunk)
+                                if total:
+                                    porcentaje = descargado / total * 100
+                                    yield porcentaje
+                                else:
+                                    yield 0
+
+                yield 100
+            except requests.RequestException as e:
+                yield 0
