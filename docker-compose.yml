@@ -8,4 +8,10 @@ services:
     container_name: descargar_peliculas_series_anime
     ports:
       - "9101:8002"  # Ajusta el puerto
+    volumes:
+      # Montar carpetas reales de tu sistema
+      - /run/media/sanmossa/Extras/Archivos/Multimedia/Peliculas:/Multimedia/Peliculas:Z
+      - /run/media/sanmossa/Extras/Archivos/Multimedia/Animes:/Multimedia/Animes:Z
+      - /run/media/sanmossa/Extras/Archivos/Multimedia/Series:/Multimedia/Series:Z
+      - /run/media/sanmossa/Extras/Archivos/Multimedia/config.json:/app/config.json:Z      
     restart: unless-stopped
