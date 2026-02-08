@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  mi-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: descargar_peliculas_series_anime
+    ports:
+      - "9101:8002"  # Ajusta el puerto
+    restart: unless-stopped
